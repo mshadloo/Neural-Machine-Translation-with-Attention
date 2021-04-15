@@ -11,7 +11,14 @@ NMT with Bidirectional LSTM has lowest loss during 20 epochs          |  NMT wit
 :-------------------------:|:-------------------------:
 ![](/images/loss.png)  |  ![](/images/accuracy.png)
 
-## Steps
+
+ ### How to run:
+```
+git clone https://github.com/mshadloo/Web-Application-with-Django-for-Object-Identification.git
+cd Web-Application-with-Django-for-Object-Identification
+chmod +x run.sh && ./run.sh
+```
+# Steps
 ### Data Preprocessing
 First of all, like any other NLP task, we load the text data and perform pre-processing and also do a train-test split.
 
