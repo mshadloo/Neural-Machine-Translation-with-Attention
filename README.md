@@ -28,6 +28,7 @@ The data needs some cleaning before being used to train our neural translation m
 ### Define The Model
 I implement encoder-decoder based seq2seq models with attention. The encoder and the decoder are pre-attention and post-attention RNNs on both sides of the attention mechanism.
 * Encoder:a RNN (Bidirectional LSTM, LSTM, GRU)
-  * the encoder goes through T_x time steps T_x: maximum length of the input sequence). 
+  * The encoder goes through T_x time steps (T_x: maximum length of the input sequence). 
 * decoder: a RNN (LSTM, GRU)
+   * The decoder goes through T_y time steps (T_y: maximum length of the output sequence). 
 
