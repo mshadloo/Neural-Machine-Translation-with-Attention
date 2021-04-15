@@ -31,4 +31,5 @@ I implement encoder-decoder based seq2seq models with attention. The encoder and
   * The encoder goes through T_x time steps (T_x: maximum length of the input sequence). 
 * Decoder: a RNN (LSTM, GRU)
    * The decoder goes through T_y time steps (T_y: maximum length of the output sequence). 
+* The attention mechanism computes the context variable  𝑐𝑜𝑛𝑡𝑒𝑥𝑡⟨𝑡⟩  for each timestep in the output ( 𝑡=1,…,𝑇𝑦 ).
 
