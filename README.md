@@ -23,6 +23,11 @@ The data needs some cleaning before being used to train our neural translation m
 7.  Create two dictionaries mapping from each word in vocabulary to an id, and the id to the word. 
 8.  Mark all out of vocabulary (OOV) words with a special token \<unk\>
 9. Pad each sentence to a maximum length by adding special token \<pad\> at the end of the sentence.
-10. Convert each sentence to its feature vector:
+10. Convert each sentence to its feature vector
 
+### Define The Model
+I implement encoder-decoder based seq2seq models with attention. The encoder and the decoder are pre-attention and post-attention RNNs on both sides of the attention mechanism.
+* Encoder:a RNN (Bidirectional LSTM, LSTM, GRU)
+  * the encoder goes through $T_x$ time steps ($T_x$: maximum length of the input sequence). 
+* decoder: a RNN (LSTM, GRU)
 
