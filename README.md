@@ -19,10 +19,10 @@ The data needs some cleaning before being used to train our neural translation m
 3. Removing non-printable characters.
 4. Converting French characters to Latin characters.
 5. Removing words that contain non-alphabetic characters. 
-6. Add a special token <eos> at the end of target sentences
+6. Add a special token \<eos\> at the end of target sentences
 7.  Create two dictionaries mapping from each word in vocabulary to an id, and the id to the word. 
 8.  Mark all out of vocabulary (OOV) words with a special token \<unk\>
-9. Pad each sentence to a maximum length by adding special token <pad> at the end of the sentence.
+9. Pad each sentence to a maximum length by adding special token \<pad\> at the end of the sentence.
 10. Convert each sentence to its feature vector:
 
 
