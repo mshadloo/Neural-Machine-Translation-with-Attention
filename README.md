@@ -7,7 +7,7 @@ To evaluate the models, I use English-French dataset provided by [http://www.man
 ## Experiment
 I computed accuracy and loss on both training and validation set on all of these three models and compared the resutls. The experiments show that the model with a Bidirectional LSTM as encoder outperforms.
 
-## How to run
+
 ## Steps
 ### Data Preprocessing
 First of all, like any other NLP task, we load the text data and perform pre-processing and also do a train-test split.
