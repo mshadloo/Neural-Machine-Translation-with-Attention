@@ -4,9 +4,31 @@ I implement encoder-decoder based seq2seq models with attention. The encoder can
 
 ## Dataset
 To evaluate the models, I use English-French dataset provided by [http://www.manythings.org/anki/](http://www.manythings.org/anki/)
-
+## Experiment
 I computed accuracy and loss on both training and validation set on all of these three models and compared the resutls. The experiments show that the model with a Bidirectional LSTM as encoder outperforms.
+
 ## How to run
+## Steps
+### Data Preprocessing
+First of all, like any other NLP task, we load the text data and perform pre-processing and also do a train-test split.
+
+
+The data needs some cleaning before being used to train our neural translation model.
+1. Normalizing case to lowercase.
+2. Removing punctuation from each word.
+3. Removing non-printable characters.
+4. Converting French characters to Latin characters.
+5. Removing words that contain non-alphabetic characters. 
+6. Add a special token $<eos>$ at the end of target sentences
+7.  Create two dictionaries mapping from each word in vocabulary to an id, and the id to the word. 
+8.  Mark all out of vocabulary (OOV) words with a special token $<unk>$
+9. Pad each sentence to a maximum length by adding special token $<pad>$ at the end of the sentence.
+10. Convert each sentence to its feature vector:
+
+### Define Model
+
+
+
 
  The result shows that the first model outperms.
 
