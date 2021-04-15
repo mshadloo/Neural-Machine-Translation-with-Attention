@@ -1,174 +1,133 @@
+import tensorflow as tf
+import pickle
+from collections import Counter, defaultdict
+from unicodedata import normalize
+import re
 import numpy as np
-from faker import Faker
-import random
-from tqdm import tqdm
-from babel.dates import format_date
-from keras.utils import to_categorical
-import keras.backend as K
-# import matplotlib.pyplot as plt
+import tensorflow.keras.backend as K
+import os
+from tensorflow.keras.models import load_model
+import math
+def load_data(file):
+    lines = open(file, encoding='UTF-8').read().strip().split('\n')
+    sentence_pairs = []
+    for line in lines:
+        if '\t' not in line:
+            continue
 
-fake = Faker()
-Faker.seed(1988)
-random.seed(1988)
+        s1, s2, _ = line.rstrip().split('\t')
+        sentence_pairs.append([s1, s2])
+    return sentence_pairs
 
-# Define format of the data we would like to generate
-FORMATS = ['short',
-           'medium',
-           'long',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'full',
-           'd MMM YYY',
-           'd MMMM YYY',
-           'dd MMM YYY',
-           'd MMM, YYY',
-           'd MMMM, YYY',
-           'dd, MMM YYY',
-           'd MM YY',
-           'd MMMM YYY',
-           'MMMM d YYY',
-           'MMMM d, YYY',
-           'dd.MM.YY']
-
-# change this if you want it to work with another language
-LOCALE = 'en_US'
+def filter(sentence_pairs, Tx, Ty):
+  # import pdb; pdb.set_trace()
+  lengths = [ [len(s1.split()), len(s2.split())] for s1,s2 in sentence_pairs]
+  good = [ True if (l1 <=Tx) and (l2 <=Ty) else False for l1,l2 in lengths]
+  filtered = [s for i,s in enumerate(sentence_pairs) if good[i]]
+  return filtered
 
 
-def random_fake_date():
-    """
-        Loads some fake dates
-        :returns: tuple containing human readable string, machine readable string, and date object
-    """
-    dt = fake.date_object()
-
-    try:
-        human_readable = format_date(dt, format=random.choice(FORMATS),
-                                     locale='en_US')  
-        human_readable = human_readable.lower().replace(',', '')
-        machine_readable = dt.isoformat()
-
-    except AttributeError as e:
-        return None, None, None
-
-    return human_readable, machine_readable, dt
+def unicode_to_ascii(s):
+    s = normalize('NFD', s).encode('ascii', 'ignore')
+    return s.decode('UTF-8')
 
 
-def generate_dataset(m):
-    """
-        generates a dataset with m examples and vocabularies
-        :m: the number of examples to generate
-        :returns: 
-        dataset: a list of tuples of (human readable date, machine readable date)
-        human : a python dictionary mapping all characters used in the human readable dates to an integer-valued index.
-        machine: a python dictionary mapping all characters used in machine readable dates to an integer-valued index. 
-        inv_machine : the inverse dictionary of machine dictionary, mapping from indices back to characters. 
-        
-    """
+def clean_sentence(sentence):
+    sentence = unicode_to_ascii(sentence.lower().strip())
 
-    human_vocab = set()
-    machine_vocab = set()
-    dataset = []
-    Tx = 30
+    # creating a space between a word and the punctuation following it. Ex: "he is a boy." => "he is a boy ."
+    # Reference:- https://stackoverflow.com/questions/3645931/python-padding-punctuation-with-white-spaces-keeping-punctuation
+    sentence = re.sub(r"([?.!,])", r" \1 ", sentence)
+    sentence = re.sub(r'[" "]+', " ", sentence)
 
-    for i in tqdm(range(m)):
-        h, m, _ = random_fake_date()
-        if h is not None:
-            dataset.append((h, m))
-            human_vocab.update(tuple(h))
-            machine_vocab.update(tuple(m))
-    
-    #Adding two special chars, <unk> for unknown characters, and <pad> to add padding at the end
-    human = dict(zip(sorted(human_vocab) + ['<unk>', '<pad>'],
-                     list(range(len(human_vocab) + 2))))
-    inv_machine = dict(enumerate(sorted(machine_vocab)))
-    machine = {v: k for k, v in inv_machine.items()}
+    # replacing everything with space except (a-z, A-Z, ".", "?", "!", ",")
+    sentence = re.sub(r"[^a-zA-Z?.!,]+", " ", sentence)
 
-    return dataset, human, machine, inv_machine
+    sentence = sentence.rstrip().strip()
+    return sentence
 
 
-def preprocess_data(dataset, human_vocab, machine_vocab, Tx, Ty):
-    X, Y = zip(*dataset)
+class LanguageVocab:
+    def __init__(self, sentences):
+        self.vocab = self.make_vocab(sentences)
+        self.vocab.update({'<eos>', '<sos>'})
+        self.word_idx = self.word_index()
+        self.idx_word = self.reverse_word_index()
 
-    X = np.array([string_to_int(i, Tx, human_vocab) for i in X])
-    Y = [string_to_int(t, Ty, machine_vocab) for t in Y]
+    def make_vocab(self, sentences, min_occurance=3):
+        token_count = Counter()
+        for sentence in sentences:
+            tokens = sentence.split()
+            token_count.update(tokens)
+        print("total vocab-before triming:", len(token_count))
+        vocab = [k for k, c in token_count.items() if c >= min_occurance]
+        print("total vocab-after triming:", len(vocab))
+        return set(vocab)
 
-    Xoh = np.array(list(map(lambda x: to_categorical(x, num_classes=len(human_vocab)), X)))
-    Yoh = np.array(list(map(lambda x: to_categorical(x, num_classes=len(machine_vocab)), Y)))
+    def word_index(self):
+        vocab = sorted(self.vocab)
+        return dict(zip(['<pad>'] + vocab + ['<unk>'], list(range(len(vocab) + 2))))
 
-    return X, np.array(Y), Xoh, Yoh
+    def reverse_word_index(self):
+        return {v: k for k, v in self.word_idx.items()}
 
 
-def string_to_int(string, length, vocab):
-    """
-    Converts all characters in the input string into a list of integers representing the positions of the
-    input string's characters in the "vocab"
+def max_length(sentences):
+    lengths = [len(s.split()) for s in sentences]
+    return max(lengths)
 
-    Arguments:
-    string -- input string, e.g. 'Wed 10 Jul 2007'
-    length -- the number of time steps you'd like, determines if the output will be padded or cut
-    vocab -- vocabulary, dictionary used to index every character of your "string"
 
-    Returns:
-    rep -- list of integers (or '<unk>') (size = length) representing the position of the string's character in the vocabulary
-    """
+def features(sentence, language_vocab, max_length):
+    tokens = sentence.split()
 
-    # make lower to standardize
-    string = string.lower()
-    string = string.replace(',', '')
+    tokens = [token if token in language_vocab.vocab else '<unk>' for token in tokens]
 
-    if len(string) > length:
-        string = string[:length]
-
-    rep = list(map(lambda x: vocab.get(x, '<unk>'), string))
-
-    if len(string) < length:
-        rep += [vocab['<pad>']] * (length - len(string))
-
-    # print (rep)
+    tokens.extend(['<pad>'] * (max_length - len(tokens)))
+    rep = list(map(lambda x: language_vocab.word_idx[x], tokens))
     return rep
+def preprocess_sentences(sentences):
+
+  language_vocab = LanguageVocab(sentences)
+  lang_max_length = max_length(sentences)
+  X = np.array([features(s,language_vocab, lang_max_length) for s in sentences])
+  return X, language_vocab, lang_max_length
+
+def save_pairs_dict(sentence_pairs):
+  inp_ref_dict = defaultdict(list)
+  for s1,s2 in sentence_pairs:
+    inp_ref_dict[s1].append(s2)
+
+def prepare_data(sentence_pairs, num_examples=0, Tx = 15, Ty=18):
+    clean_sentence_pairs = [[clean_sentence(s1),clean_sentence(s2)]  for s1,s2 in sentence_pairs]
+    clean_sentence_pairs = filter(clean_sentence_pairs, Tx, Ty)
+    if num_examples > 0:
+        clean_sentence_pairs = clean_sentence_pairs[0:num_examples]
+    input_sentences = [s1 for s1, s2 in clean_sentence_pairs]
+    target_sentences = [s2 for s1, s2 in clean_sentence_pairs]
+    X, inp_vocab, inp_length = preprocess_sentences(input_sentences)
+    Y, targ_vocab, targ_length = preprocess_sentences(target_sentences)
+    return X, Y, inp_vocab, targ_vocab, inp_length, targ_length
 
 
-def int_to_string(ints, inv_vocab):
-    """
-    Output a machine readable list of characters based on a list of indexes in the machine's vocabulary
+def loss_func(y_train, pred):
+    mask = K.cast(y_train > 0, dtype='float32')
+    mask2 = tf.greater(y_train, 0)
+    non_zero_y = tf.boolean_mask(pred, mask2)
+    val = K.log(non_zero_y)
 
-    Arguments:
-    ints -- list of integers representing indexes in the machine's vocabulary
-    inv_vocab -- dictionary mapping machine readable indexes to machine readable characters
-
-    Returns:
-    l -- list of characters corresponding to the indexes of ints thanks to the inv_vocab mapping
-    """
-
-    l = [inv_vocab[i] for i in ints]
-    return l
+    return  -K.sum(val) / K.sum(mask)
 
 
-# EXAMPLES = ['3 May 1979', '5 Apr 09', '20th February 2016', 'Wed 10 Jul 2007']
+def acc_func(y_train, pred):
 
-# #
-# # def run_example(model, input_vocabulary, inv_output_vocabulary, text):
-# #     encoded = string_to_int(text, TIME_STEPS, input_vocabulary)
-# #     prediction = model.predict(np.array([encoded]))
-# #     prediction = np.argmax(prediction[0], axis=-1)
-# #     return int_to_string(prediction, inv_output_vocabulary)
+    targ = K.argmax(y_train, axis=-1)
+    pred = K.argmax(pred, axis=-1)
+    correct = K.cast(K.equal(targ, pred), dtype='float32')
 
-
-# # def run_examples(model, input_vocabulary, inv_output_vocabulary, examples=EXAMPLES):
-# #     predicted = []
-# #     for example in examples:
-# #         predicted.append(''.join(run_example(model, input_vocabulary, inv_output_vocabulary, example)))
-# #         print('input:', example)
-# #         print('output:', predicted[-1])
-# #     return predicted
-
+    mask = K.cast(K.greater(targ, 0), dtype='float32')  # filter out padding value 0.
+    correctCount = K.sum(mask * correct)
+    totalCount = K.sum(mask)
+    return  correctCount / totalCount
 
 def softmax(x, axis=1):
     """Softmax activation function.
@@ -190,74 +149,58 @@ def softmax(x, axis=1):
     else:
         raise ValueError('Cannot apply softmax to a tensor that is 1D')
 
+def make_batch(X, Y, shuffle=True, batch_size=64):
+    idx = np.arange(len(X))
+    if shuffle:
+        np.random.shuffle(idx)
+    dataset = []
+    batchs = math.ceil(len(X) / batch_size)
+    for b in range(batchs):
+        s = b * 64
+        e = min(s + 64, len(X))
+        dataset.append([b, X[s:e], Y[s:e]])
+    return dataset
 
-# def plot_attention_map(model, input_vocabulary, inv_output_vocabulary, text, n_s=128, num=6, Tx=30, Ty=10):
-#     """
-#     Plot the attention map.
+def save_result(loss, acc, loss_test, acc_test, best_acc, dir):
+  f ={}
+  f['loss'] = loss
+  f['acc'] = acc
+  f['loss_test'] = loss_test
+  f['acc_test'] = acc_test
+  f['best_acc'] = best_acc
+  name = open(os.path.join(dir,'result.pkl'),'wb')
+  pickle.dump(f,name)
+  name.close()
 
-#     """
-#     attention_map = np.zeros((10, 30))
-#     Ty, Tx = attention_map.shape
+def load_result(dir):
+    pkl_file = open(os.path.join(dir, 'result.pkl'), 'rb')
+    f = pickle.load(pkl_file)
+    loss = f['loss']
+    acc = f['acc']
+    loss_test = f['loss_test']
+    acc_test = f['acc_test']
+    best_acc = f['best_acc']
+    pkl_file.close()
+    return loss, acc, loss_test, acc_test, best_acc
 
-#     s0 = np.zeros((1, n_s))
-#     c0 = np.zeros((1, n_s))
-#     layer = model.layers[num]
 
-#     encoded = np.array(string_to_int(text, Tx, input_vocabulary)).reshape((1, 30))
-#     encoded = np.array(list(map(lambda x: to_categorical(x, num_classes=len(input_vocabulary)), encoded)))
+def save_model(model, epoch, dir):
+  f = {}
+  f['model'] = model
+  f['epoch'] = epoch
+  name = open(os.path.join(dir,'model.pkl'),'wb')
+  pickle.dump(f,name)
+  name.close()
+  model.save(os.path.join(dir,'train_model.h5'), os.path.join(dir,'infer_model.h5'))
 
-#     f = K.function(model.inputs, [layer.get_output_at(t) for t in range(Ty)])
-#     r = f([encoded, s0, c0])
 
-#     for t in range(Ty):
-#         for t_prime in range(Tx):
-#             attention_map[t][t_prime] = r[t][0, t_prime, 0]
 
-#     # Normalize attention map
-#     #     row_max = attention_map.max(axis=1)
-#     #     attention_map = attention_map / row_max[:, None]
-
-#     prediction = model.predict([encoded, s0, c0])
-
-#     predicted_text = []
-#     for i in range(len(prediction)):
-#         predicted_text.append(int(np.argmax(prediction[i], axis=1)))
-
-#     predicted_text = list(predicted_text)
-#     predicted_text = int_to_string(predicted_text, inv_output_vocabulary)
-#     text_ = list(text)
-
-#     # get the lengths of the string
-#     input_length = len(text)
-#     output_length = Ty
-
-#     # Plot the attention_map
-#     plt.clf()
-#     f = plt.figure(figsize=(8, 8.5))
-#     ax = f.add_subplot(1, 1, 1)
-
-#     # add image
-#     i = ax.imshow(attention_map, interpolation='nearest', cmap='Blues')
-
-#     # add colorbar
-#     cbaxes = f.add_axes([0.2, 0, 0.6, 0.03])
-#     cbar = f.colorbar(i, cax=cbaxes, orientation='horizontal')
-#     cbar.ax.set_xlabel('Alpha value (Probability output of the "softmax")', labelpad=2)
-
-#     # add labels
-#     ax.set_yticks(range(output_length))
-#     ax.set_yticklabels(predicted_text[:output_length])
-
-#     ax.set_xticks(range(input_length))
-#     ax.set_xticklabels(text_[:input_length], rotation=45)
-
-#     ax.set_xlabel('Input Sequence')
-#     ax.set_ylabel('Output Sequence')
-
-#     # add grid and legend
-#     ax.grid()
-
-#     # f.show()
-
-#     return attention_map
-# load_dataset(2)
+def load_model(dir):
+  pkl_file = open(os.path.join(dir,'model.pkl'), 'rb')
+  f = pickle.load(pkl_file)
+  model = f['model']
+  epoch = f['epoch']
+  pkl_file.close()
+  model.train_model = load_model(os.path.join(dir,'train_model.h5'))
+  model.inference_model  = load_model(os.path.join(dir,'infer_model.h5'))
+  return model, epoch
