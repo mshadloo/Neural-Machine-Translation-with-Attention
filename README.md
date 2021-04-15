@@ -7,6 +7,9 @@ To evaluate the models, I use English-French dataset provided by [http://www.man
 ## Experiment
 I computed accuracy and loss on both training and validation set on all of these three models and compared the resutls. The experiments show that the model with a Bidirectional LSTM as the encoder outperforms the rest.
 
+NMT with Bidirectional LSTM has lowest loss during 20 epochs          |  NMT with Bidirectional LSTM has highest accuracy during 20 epochs 
+:-------------------------:|:-------------------------:
+![](/images/loss.png)  |  ![](/images/accuracy.png)
 
 ## Steps
 ### Data Preprocessing
