@@ -5,7 +5,7 @@ I implement encoder-decoder based seq2seq models with attention. The encoder can
 ## Dataset
 To evaluate the models, I use English-French dataset provided by [http://www.manythings.org/anki/](http://www.manythings.org/anki/)
 ## Experiment
-I computed accuracy and loss on both training and validation set on all of these three models and compared the resutls. The experiments show that the model with a Bidirectional LSTM as encoder outperforms.
+I computed accuracy and loss on both training and validation set on all of these three models and compared the resutls. The experiments show that the model with a Bidirectional LSTM as the encoder outperforms the rest.
 
 
 ## Steps
