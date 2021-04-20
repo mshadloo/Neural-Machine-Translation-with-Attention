@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--rnn_arch', '-a', metavar='RNN', default='bidirectional',
                     choices=rnn_arch,
                     help='RNN architecture: ' + ' | '.join(rnn_arch) +
-                    ' (default: resnet32)')
+                    ' (default: rbidirectional)')
 parser.add_argument('--epochs', default=20, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--hidden', default=1024, type=int, metavar='N',
